@@ -1,0 +1,40 @@
+/*
+  Name    :  ConnectionHelper
+  Description  :  ConnectionHelper is used return the SF connection Id and SF connection user Id
+*/
+public class ConnectionHelper {
+  /*
+    METHOD Name    :  getConnectionId
+    Input param    :  connectionName (Name of the connection)
+    Output param  :  conncetionId (SFDC connection Id)
+  */
+    public static Id getConnectionId(String connectionName) {
+    
+        List<PartnerNetworkConnection> partnerNetConList =
+           [Select id from PartnerNetworkConnection where connectionStatus = 'Accepted' and connectionName = :connectionName];
+        
+        if ( partnerNetConList.size() != 0 ) {
+            return partnerNetConList.get(0).Id;
+        }
+        
+        return null;
+    }
+
+    /*  TEMPORARILY DEPRECATED
+    METHOD Name    :  getConnectionOwnerId
+    Input param    :  connectionName (Name of the connection)
+    Output param  :  conncetionUserId (SFDC connection user Id)
+  
+    public static Id getConnectionOwnerId(String connectionName) {
+
+    List<PartnerNetworkConnection> partnerNetConList = [SELECT createdById FROM PartnerNetworkConnection WHERE connectionStatus = 'Accepted' and connectionName = :connectionName];
+        
+        if ( partnerNetConList.size() != 0 ) {
+            return partnerNetConList.get(0).createdById;
+        }
+        
+        return null;
+    }
+  */  
+
+}

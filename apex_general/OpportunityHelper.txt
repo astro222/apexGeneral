@@ -1,0 +1,76 @@
+public with sharing class OpportunityHelper {
+  
+  public static void createOpportunitiesForLCR(List<LawyerConnectionRequest__c>lcrList) {
+    Set<Id>accIds = new Set<Id>();
+    Set<Id>conIds = new Set<Id>();
+    for (LawyerConnectionRequest__c cur : lcrList) {
+      conIds.add(cur.Client__c);
+    }
+
+    Map<Id, Contact>contactMap = new Map<Id, Contact>();
+    Map<Id, List<Contact>>acctIdToContactMap = new Map<Id, List<Contact>>();
+    for (Contact cur : [SELECT id, AccountId, SubscriptionStatus__c
+              FROM Contact
+              WHERE id in :conIds]) {
+      accIds.add(cur.AccountId);
+      contactMap.put(cur.Id, cur);
+
+      if (!acctIdToContactMap.containsKey(cur.AccountId)) {
+        acctIdToContactMap.put(cur.AccountId, new List<Contact>());
+      }
+      acctIdToContactMap.get(cur.AccountId).add(cur);
+    }
+
+    Map<Id, Account>accountMap = new Map<Id, Account>([SELECT id, OwnerId, External_Account_ID__c
+                               FROM Account 
+                               WHERE Id in :accIds]);
+
+    List<Opportunity>oppsToInsert = new List<Opportunity>();
+    
+    for (LawyerConnectionRequest__c cur : lcrList) {
+      
+      if (contactMap.containsKey(cur.Client__c) && accountMap.containsKey(contactMap.get(cur.Client__c).AccountId) && contactMap.get(cur.Client__c).SubscriptionStatus__c != 'Active') {
+        Opportunity tempOpp = createOpportunity('Pro Legal Plan - Annual (A)', accountMap.get(contactMap.get(cur.Client__c).AccountId), 'Open', 'LawyerConnectionRequest', 'Plan', 'Plan', cur);
+        oppsToInsert.add(tempOpp);
+      }
+    }
+
+    if (!oppsToInsert.isEmpty()) {
+      insert oppsToInsert;
+      createOpportunityContactRoles(oppsToInsert, acctIdToContactMap);
+    }
+  }
+
+  public static void createOpportunityContactRoles(List<Opportunity>opps, Map<Id, List<Contact>>acctIdToContactMap) {
+    List<OpportunityContactRole>ocrList = new List<OpportunityContactRole>();
+    for (Opportunity opp : opps) {
+      if (opp.AccountId != null && acctIdToContactMap.containsKey(opp.AccountId)) {
+        for (Contact curCon : acctIdToContactMap.get(opp.AccountId)) {
+          ocrList.add(new OpportunityContactRole(ContactId = curCon.Id, OpportunityId = opp.Id));    
+        }
+      }
+    }
+
+    if (!ocrList.isEmpty()) {
+      insert ocrList;
+    }
+  }
+
+  public static Opportunity createOpportunity(String name, Account acc, String stage, String motivatingProduct, String primaryProduct, String objectType, LawyerConnectionRequest__c lcr) {
+    Opportunity newOpp = new Opportunity();
+    newOpp.Name = name;
+    newOpp.AccountId = acc.Id;
+    newOpp.CloseDate= Date.today().addYears(50);
+    newOpp.StageName = stage;
+    newOpp.MotivatingProductFamily__c = motivatingProduct;
+    newOpp.Score__c = 75;
+    newOpp.PrimaryProductFamily__c = primaryProduct;
+    newOpp.OpenDate__c = Date.today();
+    newOpp.ObjectType__c = objectType;
+    newOpp.OwnerId = acc.OwnerId;
+    newOpp.External_Opportunity_ID__c = acc.External_Account_ID__c;
+    newOpp.Lawyer_Connection_Request__c = lcr.Id;
+
+    return newOpp;
+  }
+}

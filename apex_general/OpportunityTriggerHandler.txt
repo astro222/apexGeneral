@@ -1,0 +1,98 @@
+public with sharing class OpportunityTriggerHandler {
+    private Boolean m_isExecuting = false;
+    private Integer batchSize = 0;
+
+  public OpportunityTriggerHandler(boolean isExecuting, integer size) {
+        this.m_isExecuting = isExecuting;
+        this.batchSize = size;
+  }
+
+  public void OnAfterInsert(Opportunity[] newOpportunity) {
+
+           System.debug('@ OnAfterInsert');
+           Map<Id, String>accountToDocTypeMap = new Map<Id, String>();
+           Map<Id, String>accountRRYes = new Map<Id, String>();
+
+           for(Opportunity opp: newOpportunity) {
+               if (opp.MotivatingProductFamily__c != null) {
+                  if (opp.MotivatingProductFamily__c.equals('Incorporation')) {
+                    if(opp.SalesRep_Affiliate_ID__c != null){
+                      //If an affiliate Id is found, we go through the normal process, and NOT reassign.
+                      system.debug('Yes, an Affiliate Id exists!');
+                      accountToDocTypeMap.put(opp.AccountId, 'Incorporation');
+                    }
+                    else {
+                      //If there is no affiliate Id, then we put them through the round robin process, and reassign.
+                      system.debug('No Affiliate Id found!');
+                      accountRRYes.put(opp.AccountId, 'Incorporation');
+                    }
+                  } else if (opp.MotivatingProductFamily__c.equals('ProDocument') || opp.MotivatingProductFamily__c.equals('PowerUser')) {
+                    accountToDocTypeMap.put(opp.AccountId, 'ProDocument');
+                  } else if (opp.MotivatingProductFamily__c.equals('LawyerConnectionRequest') || opp.MotivatingProductFamily__c.equals('WalmartUpgrade') || opp.MotivatingProductFamily__c.equals('PersonalDoc Lawyer Request')) {
+                    accountToDocTypeMap.put(opp.AccountId, 'LawyerConnectionRequest');
+                  } else if (opp.MotivatingProductFamily__c.equals('BenefitsUpgrade')) {
+                    accountToDocTypeMap.put(opp.AccountId, 'BenefitsUpgrade');
+                  } else if (opp.MotivatingProductFamily__c.equals('Mobile FAL')) {
+                    accountToDocTypeMap.put(opp.AccountId, 'Mobile FAL');       
+                  } else if (opp.MotivatingProductFamily__c.equals('Lendio')) {
+                    accountToDocTypeMap.put(opp.AccountId, 'Lendio');
+                  } else if (opp.MotivatingProductFamily__c.equals('GroupA')) {
+                    accountToDocTypeMap.put(opp.AccountId, 'GroupA');
+                  } else if (opp.MotivatingProductFamily__c.equals('GroupB')) {
+                    accountToDocTypeMap.put(opp.AccountId, 'GroupB');
+                  } else if (opp.MotivatingProductFamily__c.equals('GroupC')) {
+                    accountToDocTypeMap.put(opp.AccountId, 'GroupC');
+                  } else if (opp.MotivatingProductFamily__c.equals('GroupD')) {
+                    accountToDocTypeMap.put(opp.AccountId, 'GroupD');
+                  }
+               }
+           }
+          
+          if (accountRRYes != null && !accountRRYes.isEmpty()) {
+           System.debug('accountRRYes: '+accountRRYes);
+           system.debug('Firing off ACRoundRobinV5.OpportunityRoundRobin for accountRRYes');
+           ACRoundRobinV5.OpportunityRoundRobin(accountRRYes, true);
+          }
+
+          if (accountToDocTypeMap != null && !accountToDocTypeMap.isEmpty()) {
+           System.debug('accountToDocTypeMap: '+accountToDocTypeMap);
+           system.debug('Firing off ACRoundRobinV5.OpportunityRoundRobin for accountToDocTypeMap');
+           ACRoundRobinV5.OpportunityRoundRobin(accountToDocTypeMap, false);
+          }
+
+           System.debug('Exiting OnAfterInsert');           
+  }
+
+  public void OnBeforeInsert(List<Opportunity> opportunityMap) {
+      System.debug('@ OnBeforeInsert');
+      List<Opportunity> listOfOpportunityWithCoupon = new List<Opportunity>();
+      for (Opportunity opportunity : opportunityMap) {
+          if (opportunity.SalesRep_Affiliate_ID__c != null) {
+            listOfOpportunityWithCoupon.add(opportunity);
+          }
+      }
+      if (listOfOpportunityWithCoupon != null && !listOfOpportunityWithCoupon.isEmpty()) {
+        System.debug('Entering reassignACOBasedOnCouponCode.reassignBasedOnOpportunityCouponCode from Class OpportunityTriggerHandler');
+        System.debug('listOfOpportunityWithCoupon: '+listOfOpportunityWithCoupon);
+        reassignACOBasedOnCouponCode.reassignBasedOnOpportunityCouponCode(listOfOpportunityWithCoupon);
+        System.debug('Exiting reassignACOBasedOnCouponCode.reassignBasedOnOpportunityCouponCode from Class OpportunityTriggerHandler');
+      }
+      System.debug('Exiting OnBeforeInsert');
+  }
+
+  public void OnBeforeUpdate(Opportunity[] oldOpportunities, Opportunity[] updatedOpportunities, Map<Id, Opportunity> opportunityMap) {
+      System.debug('@ OnBeforeUpdate');
+      List<Opportunity> opportunitiesThatDidChange = new List<Opportunity>();
+      Integer countOpportunities = 0;
+      for (Opportunity newOpportunity : updatedOpportunities) {
+        if (newOpportunity!=null) {
+          if (newOpportunity.SalesRep_Affiliate_ID__c != oldOpportunities[countOpportunities].SalesRep_Affiliate_ID__c && newOpportunity.SalesRep_Affiliate_ID__c != null) {
+            opportunitiesThatDidChange.add(newOpportunity);
+          }
+        }
+        countOpportunities++;
+      }
+      reassignACOBasedOnCouponCode.reassignBasedOnOpportunityCouponCode(opportunitiesThatDidChange);
+      System.debug('Exiting OnBeforeUpdate');
+  }
+}

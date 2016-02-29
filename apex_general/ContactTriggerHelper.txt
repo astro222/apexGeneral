@@ -1,0 +1,17 @@
+public class ContactTriggerHelper {
+  
+  public static void findAndAttachRelatedCases(Map<String, Id>emailToContactMap) {
+
+    List<Case>casesToUpdate = new List<Case>();
+    for (Case cur : [SELECT id, ContactId, SuppliedEmail FROM Case WHERE SuppliedEmail in :emailToContactMap.keySet()]) {
+      if (emailToContactMap.containsKey(cur.SuppliedEmail)) {
+        cur.ContactId = emailToContactMap.get(cur.SuppliedEmail);
+        casesToUpdate.add(cur);
+      }
+    }
+
+    if (casesToUpdate != null && !casesToUpdate.isEmpty()) {
+      update casesToUpdate;
+    }
+  }
+}

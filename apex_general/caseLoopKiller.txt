@@ -1,0 +1,29 @@
+trigger caseLoopKiller on Case (before insert) {
+ /*
+  * Email Loop Killer
+  * Will not process new email if there are atleast 4 emails from 
+  * the same email with the same subject and the previous email was less than 5 minutes ago
+  */
+  case[] c = trigger.new;
+
+  case[] check = [select ID, CreatedDate, subject from Case where SuppliedEmail = :c[0].SuppliedEmail and subject = :c[0].subject and isclosed = false order by CreatedDate desc];
+  system.debug(c[0].SuppliedEmail);
+  system.debug(c[0].subject);
+  
+  
+  if(c[0].Subject != null) {  
+    //We have a subject, proceed.
+    if(c[0].subject.contains('[ ref:')){
+      //No Errors.  Email should be attached to the case.
+    }else{
+      if(check.size() > 3){
+        if((check[0].createddate.addMinutes(5) > System.now()) && check[0].subject.contains(c[0].subject)){
+          c[0].addError('Automatic email loop has been terminated');
+          //Loop Was Killed.
+        }else{
+          //New Case should be created now!       
+        }
+      }
+    }
+  }
+}
